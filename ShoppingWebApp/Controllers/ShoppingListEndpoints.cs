@@ -1,59 +1,56 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json.Converters;
-using ShoppingWebApp.Helpers;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.OpenApi;
 using ShoppingWebApp.Models;
-using TREKTRACKRWebAPP.Models;
+using ShoppingWebApp.Helpers;
+using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+namespace ShoppingWebApp.Controllers;
 
-namespace ShoppingWebApp.Controllers
+[Authorize]
+public static class ShoppingListEndpoints
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    [Authorize]
-    public class ShoppingListsController : ControllerBase
+    public static void MapShoppingListEndpoints (this IEndpointRouteBuilder routes)
     {
-        private readonly ShoppingDbContext _context;
+        var group = routes.MapGroup("/api/ShoppingList").WithTags(nameof(ShoppingList));
 
-        public ShoppingListsController(ShoppingDbContext context)
-        {
-            _context = context;
-        }
-
-        [HttpGet]
-        public async Task<ActionResult<APIResponse>> GetShoppingLists()
+        group.MapGet("/", async (ShoppingDbContext db) =>
         {
             IList<ShoppingList>? shoppingList = new List<ShoppingList>();
             try
             {
-                shoppingList = _context.ShoppingLists
-                            .Include(m=>m.Items).ToList();
+                shoppingList = db.ShoppingLists
+                            .Include(m => m.Items).ToList();
                 return APIResponseBuilder.getResponseObject(shoppingList, "Shopping List Fetched Successfully.", true);
             }
             catch (Exception ex)
             {
                 return APIResponseBuilder.getResponseObject(shoppingList, ex.Message, false);
             }
-        }
+        })
+        .WithName("GetAllShoppingLists")
+        .RequireAuthorization()
+        .WithOpenApi();
 
-        [HttpPost]
-        public async Task<ActionResult<APIResponse>> PostShoppingList(ShoppingList shoppingList)
+
+        group.MapPost("/", async (ShoppingList shoppingList, ShoppingDbContext db) =>
         {
-            using (var transaction = _context.Database.BeginTransaction())
+            using (var transaction = db.Database.BeginTransaction())
             {
                 try
                 {
-                    _context.ShoppingLists.Add(shoppingList);
-                    await _context.SaveChangesAsync();
+                    db.ShoppingLists.Add(shoppingList);
+                    await db.SaveChangesAsync();
                     foreach (var item in shoppingList.Items)
                     {
                         item.ShoppingListId = shoppingList.Id;
                         item.Id = 0;
-                        _context.ShoppingListItems.Add(item);
+                        db.ShoppingListItems.Add(item);
                     }
-                    await _context.SaveChangesAsync();
+                    await db.SaveChangesAsync();
                     transaction.Commit();
                     return APIResponseBuilder.getResponseObject(shoppingList, "Shopping List added Successfully", true);
                 }
@@ -63,27 +60,27 @@ namespace ShoppingWebApp.Controllers
                     return APIResponseBuilder.getResponseObject(shoppingList, ex.Message, false);
                 }
             }
-            
-        }
-        [HttpPost("share")]
-        public ActionResult<APIResponse> ShareShoppingList([FromQuery, Required] int listId,PermissionOptions? permission, string sharedWith = "")
+        })
+        .WithName("CreateShoppingList")
+        .WithOpenApi();
+        group.MapPost("/share", async ([FromQuery, Required] int listId, PermissionOptions? permission, ShoppingDbContext db, UserManager<IdentityUser> _userManager, string sharedWith = "") =>
         {
             try
             {
-                var getUserWithEmail = _context.Users.Where(m => m.Email == sharedWith).FirstOrDefault();
+                var getUserWithEmail =_userManager.FindByEmailAsync(sharedWith);
                 if (getUserWithEmail != null)
                 {
                     var sharedListObj = new SharedList
                     {
-                        SharedListWithId = getUserWithEmail.Id,
+                        SharedListWithId = getUserWithEmail.Result.Id,
                         Permission = permission.ToString(),
                         ShoppingListId = listId,
                         CreatedBy = "Admin",
                         CreatedDate = DateTime.Now,
                         Status = Helpers.Constants.Status.Active
                     };
-                    _context.SharedLists.Add(sharedListObj);
-                    _context.SaveChanges();
+                    db.SharedLists.Add(sharedListObj);
+                    db.SaveChanges();
                     return APIResponseBuilder.getResponseObject(sharedListObj, "Shopping List shared successfully with " + sharedWith, true);
                 }
                 return APIResponseBuilder.getResponseObject("", "No User Exist with this Email " + sharedWith, true);
@@ -94,15 +91,16 @@ namespace ShoppingWebApp.Controllers
                 return APIResponseBuilder.getResponseObject("", "Error! While sharing list with " + sharedWith, true);
 
             }
-        }
-        [HttpGet("shared")]
-        public ActionResult<APIResponse> SharedShoppingList([FromQuery, Required] int userId)
+        })
+        .WithName("ShareShoppingList")
+        .WithOpenApi();
+        group.MapGet("/shared", async ([FromQuery, Required] string userId,ShoppingDbContext db) =>
         {
             IList<ShoppingList>? sharedList = new List<ShoppingList>();
             try
             {
-                var sharedShoppingListId=_context.SharedLists.Where(m=>m.SharedListWithId== userId).Select(m=>m.ShoppingListId).ToList();
-                sharedList = _context.ShoppingLists.Where(m => sharedShoppingListId.Contains(m.Id))
+                var sharedShoppingListId = db.SharedLists.Where(m => m.SharedListWithId == userId).Select(m => m.ShoppingListId).ToList();
+                sharedList = db.ShoppingLists.Where(m => sharedShoppingListId.Contains(m.Id))
                     .Include(m => m.Items).ToList();
                 return APIResponseBuilder.getResponseObject(sharedList, "Shared Shopping List Fetched Successfully.", true);
             }
@@ -110,12 +108,13 @@ namespace ShoppingWebApp.Controllers
             {
                 return APIResponseBuilder.getResponseObject(sharedList, ex.Message, false);
             }
-        }
-        public enum PermissionOptions
-        {
-            Read,
-            Write
-        }
+        })
+       .WithName("SharedShoppingLists")
+       .WithOpenApi();
     }
-
+    public enum PermissionOptions
+    {
+        Read,
+        Write
+    }
 }

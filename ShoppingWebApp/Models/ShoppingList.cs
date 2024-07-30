@@ -7,7 +7,7 @@ public partial class ShoppingList:Common
 {
     public int Id { get; set; }
 
-    public int? BuyerId { get; set; }
+    public string? BuyerId { get; set; }
 
     public double? SubTotal { get; set; }
 

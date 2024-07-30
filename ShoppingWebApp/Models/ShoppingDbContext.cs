@@ -21,8 +21,6 @@ public partial class ShoppingDbContext : DbContext
 
     public virtual DbSet<ShoppingListItem> ShoppingListItems { get; set; }
 
-    public virtual DbSet<User> Users { get; set; }
-
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseSqlServer("Server=TT16\\SQLEXPRESS;Database=shopping_db;Trusted_Connection=True;TrustServerCertificate=True");
@@ -110,47 +108,6 @@ public partial class ShoppingDbContext : DbContext
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .HasColumnName("status");
-        });
-
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK_Users");
-
-            entity.ToTable("users");
-
-            entity.Property(e => e.Address)
-                .HasMaxLength(100)
-                .HasColumnName("address");
-            entity.Property(e => e.CreatedBy)
-                .HasMaxLength(50)
-                .HasColumnName("created_by");
-            entity.Property(e => e.CreatedDate)
-                .HasColumnType("datetime")
-                .HasColumnName("created_date");
-            entity.Property(e => e.Email)
-                .HasMaxLength(50)
-                .HasColumnName("email");
-            entity.Property(e => e.FullName)
-                .HasMaxLength(50)
-                .HasColumnName("full_name");
-            entity.Property(e => e.ModifiedBy)
-                .HasMaxLength(50)
-                .HasColumnName("modified_by");
-            entity.Property(e => e.ModifiedDate)
-                .HasColumnType("datetime")
-                .HasColumnName("modified_date");
-            entity.Property(e => e.Password)
-                .HasMaxLength(50)
-                .HasColumnName("password");
-            entity.Property(e => e.PhoneNo)
-                .HasMaxLength(50)
-                .HasColumnName("phone_no");
-            entity.Property(e => e.Status)
-                .HasMaxLength(50)
-                .HasColumnName("status");
-            entity.Property(e => e.Username)
-                .HasMaxLength(50)
-                .HasColumnName("username");
         });
 
         OnModelCreatingPartial(modelBuilder);
